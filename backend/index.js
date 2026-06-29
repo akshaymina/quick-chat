@@ -31,7 +31,8 @@ app.use(cookieParser()); app.use(
 
 const allowedOrigins = [
   "http://localhost:3000",
-  "https://chat-app23.onrender.com"
+  "https://chat-app23.onrender.com",
+  " http://172.19.101.243:3000"
 ];
 
 app.use(cors({

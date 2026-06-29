@@ -49,6 +49,7 @@ export const login = async (req, res) => {
     }
 
     const user = await User.findOne({ username });
+    console.log(user);
     if (!user) {
       return res.status(400).json({
         message: "Incorrect username or password",
@@ -61,12 +62,14 @@ export const login = async (req, res) => {
       return res.status(400).json({
         message: "Incorrect username or password",
         success: false,
-      })
-
+      });
     }
+
+
     const tokenData = {
       userId: user._id,
     }
+
     const token = await jwt.sign(tokenData, process.env.JWT_SECRET_KEY, {
       expiresIn: "1d",
     });
