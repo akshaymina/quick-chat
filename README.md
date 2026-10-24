@@ -49,7 +49,7 @@ Chat App lets registered users talk one-to-one in real time. Messages are stored
 | **Authentication** | Signup, login and logout with JWT stored in an httpOnly cookie |
 | **Messaging** | Real-time one-to-one chat, persisted history, per-chat drafts |
 | **Presence** | Online / offline indicator for every contact (multi-tab safe) |
-| **Attachments** | Images, PDF and audio uploads (10 MB limit, type allow-list) |
+| **Attachments** | Images, PDF  uploads (10 MB limit, type allow-list) |
 | **Message tools** | Edit within 5 minutes, delete for me |
 | **Self-destruct** | Messages that vanish after 30 seconds, 1 minute or 5 minutes |
 | **Smart replies** | One-tap suggested replies based on the last incoming message |
