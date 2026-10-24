@@ -16,6 +16,7 @@ const statusSchema = new mongoose.Schema(
 
     text: {
       type: String,
+      maxlength: 700,
     },
 
     mediaUrl: {
@@ -36,10 +37,14 @@ const statusSchema = new mongoose.Schema(
 
     expiresAt: {
       type: Date,
-      default: () => Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+      default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
     },
   },
   { timestamps: true }
 );
+
+// Let MongoDB delete expired statuses automatically (the queries only hide
+// them, so without this the collection grows forever).
+statusSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const Status = mongoose.model("Status", statusSchema);

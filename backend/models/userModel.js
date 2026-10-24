@@ -1,30 +1,33 @@
 import mongoose from "mongoose";
-// userModel is an object(instance) of the mongoose.Schema class.
-const userModel = new mongoose.Schema({
+
+const userSchema = new mongoose.Schema(
+  {
     fullName: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
+      trim: true,
     },
     username: {
-        type: String,
-        required: true,
-        unique: true
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
     password: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     profilePhoto: {
-        type: String,
-        default: ""
+      type: String,
+      default: "",
     },
     gender: {
-        type: String,
-        enum: ["male", "female"],
-        required: true
-    }
-}, { timestamps: true });
-export const User = mongoose.model("User", userModel);
+      type: String,
+      enum: ["male", "female"],
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
 
-
-console.log(userModel)
+export const User = mongoose.model("User", userSchema);

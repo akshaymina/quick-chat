@@ -11,7 +11,7 @@ const StatusItem = ({ status }) => {
         className="flex items-center gap-3 mb-3 cursor-pointer"
       >
         <img
-          src={status.userId?.profilePic}
+          src={status.userId?.profilePhoto}
           alt=""
           className="w-10 h-10 rounded-full border-2 border-green-500"
         />

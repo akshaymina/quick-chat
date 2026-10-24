@@ -1,14 +1,17 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
-import { BASE_URL } from "..";
-import { removeMessage } from "../redux/messageSlice";
+import toast from "react-hot-toast";
+import { FaFilePdf, FaFileDownload } from "react-icons/fa";
+import { BASE_URL } from "../config";
+import { removeMessage, updateMessageContent } from "../redux/messageSlice";
+import { useTheme } from "../context/ThemeContext";
 
 const Message = ({ message }) => {
-  const scroll = useRef(null);
   const dispatch = useDispatch();
+  const { theme } = useTheme();
 
-  const { authUser, selectedUser } = useSelector((store) => store.user);
+  const { authUser } = useSelector((store) => store.user);
 
   const [showDelete, setShowDelete] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -25,9 +28,35 @@ const Message = ({ message }) => {
     isSender &&
     Date.now() - new Date(message?.createdAt).getTime() < EDIT_TIME;
 
+  // 🔥 SELF-DESTRUCT countdown. The actual deletion + removal from every
+  // client is driven by the backend's scheduled timer + "messageExpired"
+  // socket broadcast (handled globally in useGetRealTimeMessage.jsx) —
+  // this local countdown is purely a display concern, ticking down once a
+  // second from message.expiresAt so the user sees "Expires in Ns".
+  const [remainingSeconds, setRemainingSeconds] = useState(() => {
+    if (!message?.expiresAt) return null;
+    return Math.max(
+      0,
+      Math.ceil((new Date(message.expiresAt).getTime() - Date.now()) / 1000)
+    );
+  });
+
   useEffect(() => {
-    scroll.current?.scrollIntoView({ behavior: "smooth" });
-  }, [message]);
+    if (!message?.expiresAt) {
+      setRemainingSeconds(null);
+      return;
+    }
+    const tick = () => {
+      const secs = Math.max(
+        0,
+        Math.ceil((new Date(message.expiresAt).getTime() - Date.now()) / 1000)
+      );
+      setRemainingSeconds(secs);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [message?.expiresAt]);
 
   // Delete message
   const handleDelete = async () => {
@@ -38,7 +67,8 @@ const Message = ({ message }) => {
       );
       dispatch(removeMessage(message._id));
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to delete message");
     }
   };
 
@@ -54,11 +84,22 @@ const Message = ({ message }) => {
         { withCredentials: true }
       );
 
-      message.message = res.data.msg.message;
-      message.editedAt = res.data.msg.editedAt;
+      // BUGFIX: was mutating `message.message`/`message.editedAt` directly
+      // on the object stored in Redux, outside of any reducer. React can't
+      // reliably detect that kind of mutation as a state change, so the UI
+      // could fail to re-render with the edit until something else
+      // triggered a render. Dispatching through the proper reducer instead.
+      dispatch(
+        updateMessageContent({
+          messageId: message._id,
+          message: res.data.msg.message,
+          editedAt: res.data.msg.editedAt,
+        })
+      );
       setIsEditing(false);
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to edit message");
     } finally {
       setIsSaving(false);
     }
@@ -68,19 +109,10 @@ const Message = ({ message }) => {
     <>
       {/* MESSAGE ROW */}
       <div
-        ref={scroll}
         className={`flex w-full mb-2 px-2 ${
           isSender ? "justify-end" : "justify-start"
         }`}
       >
-        {!isSender && (
-          <img
-            src={selectedUser?.profilePhoto}
-            alt="avatar"
-            className="w-8 h-8 rounded-full mr-2 self-end"
-          />
-        )}
-
         {/* MESSAGE BUBBLE */}
         <div className="max-w-[65%]">
           <div
@@ -91,8 +123,8 @@ const Message = ({ message }) => {
             className={`relative rounded-lg text-sm break-words whitespace-pre-wrap
               ${
                 isSender
-                  ? "bg-green-600 text-white rounded-br-none"
-                  : "bg-gray-700 text-white rounded-bl-none"
+                  ? `${theme.bubbleSent} text-white rounded-br-none`
+                  : `${theme.bubbleReceived} text-white rounded-bl-none`
               }
               ${message?.image ? "p-2" : "px-3 py-2"}
             `}
@@ -108,25 +140,69 @@ const Message = ({ message }) => {
               />
             ) : (
               <div className="flex flex-col gap-1">
-                {/* IMAGE */}
+                {/* ATTACHMENT */}
+                {/* BUGFIX: previously always rendered message.image through
+                    an <img> tag no matter the actual file type. The field
+                    is named "image" but backend/messageController.js
+                    stores ANY uploaded file's URL there (PDFs, audio,
+                    etc.) — forcing a PDF through <img> just shows a
+                    broken-image icon. Branching on message.fileType so
+                    each kind renders something that actually works. */}
                 {message?.image && (
-                  <img
-                    src={`${BASE_URL}${message.image}`}
-                    alt="sent"
-                    className="max-w-[220px] rounded-lg cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPreviewImage(message.image);
-                    }}
-                  />
+                  <>
+                    {message.fileType?.startsWith("image/") ? (
+                      <img
+                        src={`${BASE_URL}${message.image}`}
+                        alt="sent"
+                        className="max-w-[220px] rounded-lg cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewImage(message.image);
+                        }}
+                      />
+                    ) : message.fileType === "application/pdf" ? (
+                      <a
+                        href={`${BASE_URL}${message.image}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 bg-black/20 hover:bg-black/30 rounded-lg p-2 max-w-[220px]"
+                      >
+                        <FaFilePdf size={22} className="shrink-0" />
+                        <span className="text-sm underline truncate">
+                          View PDF
+                        </span>
+                      </a>
+                    ) : message.fileType?.startsWith("audio/") ? (
+                      <audio
+                        controls
+                        src={`${BASE_URL}${message.image}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="max-w-[220px]"
+                      />
+                    ) : (
+                      <a
+                        href={`${BASE_URL}${message.image}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-2 bg-black/20 hover:bg-black/30 rounded-lg p-2 max-w-[220px]"
+                      >
+                        <FaFileDownload size={20} className="shrink-0" />
+                        <span className="text-sm underline truncate">
+                          Download attachment
+                        </span>
+                      </a>
+                    )}
+                  </>
                 )}
 
                 {/* TEXT + TIME (INLINE FIXED) */}
-                {message?.message && (
+                {(message?.message || message?.image || remainingSeconds !== null) && (
                   <div className="flex flex-wrap items-end gap-x-1">
-                    <span className="break-words">
-                      {message.message}
-                    </span>
+                    {message?.message && (
+                      <span className="break-words">{message.message}</span>
+                    )}
 
                     <span className="text-[10px] opacity-70 whitespace-nowrap">
                       {message?.editedAt && "(edited) "}
@@ -139,6 +215,13 @@ const Message = ({ message }) => {
                         }
                       )}
                     </span>
+
+                    {/* 🔥 self-destruct countdown */}
+                    {remainingSeconds !== null && (
+                      <span className="text-[10px] text-orange-300 whitespace-nowrap">
+                        🔥 Expires in {remainingSeconds}s
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -222,6 +305,7 @@ const Message = ({ message }) => {
         >
           <img
             src={`${BASE_URL}${previewImage}`}
+            alt="preview"
             className="max-h-[90vh] max-w-[90vw] rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />

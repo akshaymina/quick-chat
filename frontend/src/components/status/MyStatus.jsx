@@ -1,19 +1,20 @@
 import { useState } from "react";
 import axios from "axios";
-import { BASE_URL } from "../..";
-
-
+import toast from "react-hot-toast";
+import { BASE_URL } from "../../config";
 
 const MyStatus = ({ onStatusAdded }) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
 
   const addStatus = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() || isPosting) return;
 
+    setIsPosting(true);
     try {
       await axios.post(
-        "/api/v1/status",
+        `${BASE_URL}/api/v1/status`,
         { type: "text", text },
         { withCredentials: true }
       );
@@ -23,6 +24,9 @@ const MyStatus = ({ onStatusAdded }) => {
       onStatusAdded();
     } catch (err) {
       console.error(err);
+      toast.error(err.response?.data?.message || "Failed to post status");
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -44,22 +48,21 @@ const MyStatus = ({ onStatusAdded }) => {
             <textarea
               className="w-full bg-black p-2 rounded text-white"
               placeholder="Type status..."
+              maxLength={700}
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
 
             <div className="flex justify-end gap-3 mt-3">
-              <button
-                onClick={() => setOpen(false)}
-                className="text-green-500"
-              >
+              <button onClick={() => setOpen(false)} className="text-green-500">
                 Cancel
               </button>
               <button
                 onClick={addStatus}
-                className="bg-green-500 text-black px-4 py-1 rounded"
+                disabled={isPosting}
+                className="bg-green-500 text-black px-4 py-1 rounded disabled:opacity-60"
               >
-                Post
+                {isPosting ? "Posting..." : "Post"}
               </button>
             </div>
           </div>

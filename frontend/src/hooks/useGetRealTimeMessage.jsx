@@ -1,60 +1,56 @@
-// import { useEffect } from "react";
-// import {useSelector, useDispatch} from "react-redux";
-// import { setMessages } from "../redux/messageSlice";
-
-// const useGetRealTimeMessage = () => {
-//     const {socket} = useSelector(store=>store.socket);
-//     const {messages} = useSelector(store=>store.message);
-//     const dispatch = useDispatch();
-//     useEffect(()=>{
-//         socket?.on("newMessage", (newMessage)=>{
-//             dispatch(setMessages([...messages, newMessage]));
-//         });
-//         return () => socket?.off("newMessage");
-//     },[setMessages, messages]);
-// };
-// export default useGetRealTimeMessage;
-
-
-
-
-
-
-
-
-
 import { useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { setMessages, updateMessageReaction } from "../redux/messageSlice";
+import {
+  addMessage,
+  updateMessageReaction,
+  updateMessageContent,
+  removeMessage,
+} from "../redux/messageSlice";
 
 const useGetRealTimeMessage = () => {
   const { socket } = useSelector((store) => store.socket);
-  const { messages } = useSelector((store) => store.message);
+  const { selectedUser, authUser } = useSelector((store) => store.user);
   const dispatch = useDispatch();
 
   useEffect(() => {
     if (!socket) return;
 
-    // 📩 New message listener
-    socket.on("newMessage", (newMessage) => {
-      dispatch(setMessages([...messages, newMessage]));
-    });
+    const onNewMessage = (newMessage) => {
+      const belongsToOpenConversation =
+        selectedUser?._id &&
+        authUser?._id &&
+        ((newMessage.senderId === selectedUser._id &&
+          newMessage.receiverId === authUser._id) ||
+          (newMessage.senderId === authUser._id &&
+            newMessage.receiverId === selectedUser._id));
 
-    // 😀 Message reaction listener
-    socket.on("messageReaction", ({ messageId, reactions }) => {
-      dispatch(
-        updateMessageReaction({
-          messageId,
-          reactions,
-        })
-      );
-    });
-
-    return () => {
-      socket.off("newMessage");
-      socket.off("messageReaction");
+      if (belongsToOpenConversation) {
+        dispatch(addMessage(newMessage));
+      }
     };
-  }, [socket, messages, dispatch]);
+
+    const onReaction = ({ messageId, reactions }) =>
+      dispatch(updateMessageReaction({ messageId, reactions }));
+
+    const onEdited = ({ messageId, message, editedAt }) =>
+      dispatch(updateMessageContent({ messageId, message, editedAt }));
+
+    const onExpired = ({ messageId }) => dispatch(removeMessage(messageId));
+
+    socket.on("newMessage", onNewMessage);
+    socket.on("messageReaction", onReaction);
+    socket.on("messageEdited", onEdited);
+    socket.on("messageExpired", onExpired);
+
+    // Remove only OUR handlers (a bare socket.off("event") removes every
+    // listener for that event, including ones registered elsewhere).
+    return () => {
+      socket.off("newMessage", onNewMessage);
+      socket.off("messageReaction", onReaction);
+      socket.off("messageEdited", onEdited);
+      socket.off("messageExpired", onExpired);
+    };
+  }, [socket, selectedUser?._id, authUser?._id, dispatch]);
 };
 
 export default useGetRealTimeMessage;

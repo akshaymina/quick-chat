@@ -15,8 +15,5 @@ router.route("/").get(isAuthenticated, getStatuses);
 // Mark status as viewed
 router.route("/view/:id").post(isAuthenticated, viewStatus);
 
-// Yes, authentication verifies the request first,
-// and based on that verification it either sends a response back to the frontend
-// or allows the request to continue.
 
 export default router;

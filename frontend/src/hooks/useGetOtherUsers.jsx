@@ -1,29 +1,34 @@
 import axios from "axios";
 import { useEffect } from "react";
-import { useDispatch } from "react-redux";
-import { BASE_URL } from '..';
+import { useDispatch, useSelector } from "react-redux";
+import toast from "react-hot-toast";
+import { BASE_URL } from "../config";
 import { setOtherUsers } from "../redux/userSlice";
 
-// This hook automatically fetches all chat users from the server once and stores them in Redux so the app can display them anywhere.
+// Fetches all chat users once (per logged-in user) and stores them in Redux.
 const useGetOtherUsers = () => {
   const dispatch = useDispatch();
+  const { authUser } = useSelector((store) => store.user);
+  const authUserId = authUser?._id;
 
   useEffect(() => {
+    if (!authUserId) return;
+
     const fetchOtherUsers = async () => {
       try {
-        axios.defaults.withCredentials = true;  //If you do NOT use withCredentials = true, 
-                                                 // the cookie will NOT be sent to the backend.
-        const res = await axios.get(`${BASE_URL}/api/v1/user`);
-        // store in redux
-        console.log("other users -> ", res.data);
-        const usersData = res.data?.users || res.data;
-        dispatch(setOtherUsers(usersData));
+        const res = await axios.get(`${BASE_URL}/api/v1/user`, {
+          withCredentials: true,
+        });
+        dispatch(setOtherUsers(res.data?.users || res.data));
       } catch (error) {
-        console.log(error);
+        console.error("Fetch other users error:", error);
+        if (error.response?.status !== 401) {
+          toast.error(error.response?.data?.message || "Failed to load contacts");
+        }
       }
     };
     fetchOtherUsers();
-  }, [dispatch]);  //Yes, this code runs only ONE TIME when the page/component loads (or reloads).
+  }, [authUserId, dispatch]);
 };
 
 export default useGetOtherUsers;

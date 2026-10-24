@@ -12,3 +12,22 @@ html, body, #root {
   height: 100%;
   margin: 0;
 }
+
+/* Theme-aware scrollbar. Tailwind's core utilities have no
+   ::-webkit-scrollbar support without a plugin, so ThemeContext.jsx sets
+   these two CSS custom properties on <html> whenever the active theme
+   changes, and this is the one place that reads them. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track, #18181b);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, #16a34a);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  filter: brightness(1.2);
+}
